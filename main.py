@@ -6,12 +6,20 @@
 import datetime
 import grp
 import influxdb
-import ldap
 import pyslurm
 import pwd
 import re
 import sys
+import os
 import yaml
+try: 
+    import ldap
+except:
+    LDAP_ENABLE = False
+    if bool(os.getenv('SLURMINFLUXDB_WARN',default=False)):
+        sys.stderr.write('WARNING: No LDAP module found, LDAP functionality will be disabled\n')
+else:
+    LDAP_ENABLE = True
 
 def tres_to_dict(tres_csv):
     resources = {}
@@ -39,7 +47,7 @@ except:
     sys.stderr.write('Failed to get Slurm data\n')
     sys.exit(3)
 
-if config['user_lookup']:
+if LDAP_ENABLE and config['user_lookup']:
     try:
         ldap_c = ldap.initialize('ldaps://%s:636' % config['ldap_hostname'])
         ldap_c.simple_bind_s(config['ldap_username'], config['ldap_password'])
@@ -86,7 +94,7 @@ metrics['group']['jobs_pending'] = {}
 metrics['group']['queue_time'] = {}
 metrics['group']['queue_jobs'] = {}
 
-if config['user_lookup']:
+if LDAP_ENABLE and config['user_lookup']:
     metrics['ldap_attrib'] = {}
     metrics['ldap_attrib']['cpu_usage'] = {}
     metrics['ldap_attrib']['gpu_usage'] = {}
@@ -208,7 +216,7 @@ for job in jobs:
     else:
         user = user_ids[job['user_id']]
 
-    if config['user_lookup']:
+    if LDAP_ENABLE and config['user_lookup']:
         if user not in user_ldap:
             result_id = ldap_c.search(config['ldap_userbase'], ldap.SCOPE_SUBTREE, '(%s=%s)' % (config['ldap_username_attrib'], user), [config['ldap_grouping_attrib']])
             result_type, result_data = ldap_c.result(result_id, 0)
@@ -272,7 +280,7 @@ for job in jobs:
                 metrics['group']['queue_jobs'][group] += 1
                 metrics['group']['queue_time'][group] = (float(metrics['group']['queue_time'][group] + queue_time)) / metrics['group']['queue_jobs'][group]
 
-        if config['user_lookup']:
+        if LDAP_ENABLE and config['user_lookup']:
             metrics['ldap_attrib']['jobs_running'][user_ldap[user]] += 1
             metrics['ldap_attrib']['cpu_usage'][user_ldap[user]] += cpu
             metrics['ldap_attrib']['gpu_usage'][user_ldap[user]] += gpu
@@ -292,11 +300,14 @@ for job in jobs:
             for group in user_groups[user]:
                 metrics['group']['jobs_pending'][group] += 1
 
-        if config['user_lookup']:
+        if LDAP_ENABLE and config['user_lookup']:
             metrics['ldap_attrib']['jobs_pending'][user_ldap[user]] += 1
 
 payload = []
-for grouping in ['partition', 'user', 'group', 'ldap_attrib']:
+grouping = ['partition', 'user', 'group']
+if LDAP_ENABLE and config['user_lookup']:
+    grouping.append('ldap_attrib')
+for grouping in grouping:
     for reading in ['cpu_total', 'cpu_usage', 'cpu_usage_pc', 'gpu_total', 'gpu_usage', 'gpu_usage_pc', 'mem_total', 'mem_usage', 'mem_usage_pc', 'jobs_running', 'jobs_pending', 'queue_time']:
         if reading in metrics[grouping] and len(metrics[grouping][reading]) > 0:
             for key in metrics[grouping][reading].keys():
