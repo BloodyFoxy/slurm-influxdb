@@ -6,15 +6,11 @@
 import datetime
 import grp
 import influxdb
-import json
 import ldap
 import pyslurm
 import pwd
 import re
-import socket
-import struct
 import sys
-import time
 import yaml
 
 def tres_to_dict(tres_csv):
