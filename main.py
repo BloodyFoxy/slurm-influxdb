@@ -169,15 +169,15 @@ for node in nodes:
         gres_total = pyslurm.node().parse_gres(node_data['gres'][0])
         gres_usage = pyslurm.node().parse_gres(node_data['gres_used'][0])
         for g in gres_total:
-            is_gpu = re.match(r'^gpu:([0-9]+)\(?', g)
+            is_gpu = re.match(r'^gpu:(\w{0,})?:?(\d+)', g)
             if is_gpu:
-                gpu_total = int(is_gpu.group(1))
+                gpu_total = int(is_gpu.group(2))
 
         if gpu_total > 0:
             for g in gres_usage:
-                is_gpu = re.match(r'^gpu:(?:[^:]*:?)([0-9]+)\(?', g)
+                is_gpu = re.match(r'^gpu:(\w{0,})?:?(\d+)', g)
                 if is_gpu:
-                    gpu_usage = int(is_gpu.group(1))
+                    gpu_usage = int(is_gpu.group(2))
 
     metrics['partition']['gpu_total']['ALL'] += gpu_total
     metrics['partition']['gpu_usage']['ALL'] += gpu_usage
@@ -255,7 +255,7 @@ for job in jobs:
 
         gpu = 0
         if 'tres_per_node' in job and job['tres_per_node']:
-            tres_per_node = re.match(r'gpu:([0-9]+)', job['tres_per_node'])
+            tres_per_node = re.search(r'gpu:([0-9]+)', job['tres_per_node'])
             if tres_per_node:
                 gpu = int(tres_per_node.group(1)) * job['num_nodes']
 
