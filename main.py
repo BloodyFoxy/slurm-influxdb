@@ -116,7 +116,7 @@ for part in list(partitions.keys()) + ['ALL']:
     if part != 'ALL':
         hl = pyslurm.hostlist()
         hl.create(partitions[part]['nodes'])
-        for node in hl.get_list():
+        for node in [x.decode() for x in hl.get_list()]:
             if node not in node_partitions:
                 node_partitions[node] = []
             node_partitions[node].append(part)
